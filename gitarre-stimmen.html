@@ -153,7 +153,6 @@
     background: linear-gradient(to top, rgba(255,255,255,0.8), transparent);
     transform-origin: bottom center;
     transform: translateX(-50%) rotate(0deg);
-    transition: transform 0.12s ease-out;
     border-radius: 2px;
   }
   .needle::after {
@@ -432,7 +431,7 @@ async function startTuner(idx) {
   const ctx = getCtx();
   tunerAnalyser = ctx.createAnalyser();
   tunerAnalyser.fftSize = 4096;
-  tunerAnalyser.smoothingTimeConstant = 0.5;
+  tunerAnalyser.smoothingTimeConstant = 0.85;
   tunerSource = ctx.createMediaStreamSource(tunerStream);
   tunerSource.connect(tunerAnalyser);
   // NOTE: NOT connecting to masterOut — we don't want mic feedback
@@ -442,47 +441,69 @@ async function startTuner(idx) {
   row.classList.add('tuning');
 
   let inTuneCount = 0;
+  let smoothAngle = 0;         // interpolated needle angle
+  let pitchHistory = [];       // rolling buffer of valid cents readings
+  let tickCount = 0;           // slow down processing to every 3rd frame
 
   function tick() {
     tunerRAF = requestAnimationFrame(tick);
+    tickCount++;
+    if (tickCount % 3 !== 0) {
+      // Still animate needle smoothly every frame
+      needle.style.transform = `translateX(-50%) rotate(${smoothAngle.toFixed(1)}deg)`;
+      return;
+    }
+
     const pitch = detectPitch(tunerAnalyser, ctx.sampleRate);
 
     if (!pitch || pitch < 60 || pitch > 1400) {
-      statusEl.textContent = 'WARTE ...';
-      statusEl.style.color = '';
-      freqDisp.innerHTML = `— Hz &nbsp;·&nbsp; Ziel: ${s.freq.toFixed(2)} Hz`;
-      needle.style.transform = `translateX(-50%) rotate(0deg)`;
+      pitchHistory = [];
+      // Drift needle back to center slowly
+      smoothAngle += (0 - smoothAngle) * 0.08;
+      needle.style.transform = `translateX(-50%) rotate(${smoothAngle.toFixed(1)}deg)`;
+      if (Math.abs(smoothAngle) < 1) {
+        statusEl.textContent = 'WARTE ...';
+        statusEl.style.color = '';
+        freqDisp.innerHTML = `— Hz &nbsp;·&nbsp; Ziel: ${s.freq.toFixed(2)} Hz`;
+      }
       inTuneCount = 0;
       return;
     }
 
     // Find closest harmonic/sub-harmonic near target
-    let bestFreq = pitch;
-    let bestDiff = Infinity;
+    let bestFreq = pitch, bestDiff = Infinity;
     for (let m = 0.5; m <= 4; m += 0.5) {
       const candidate = pitch * m;
       const diff = Math.abs(centsDiff(candidate, s.freq));
       if (diff < bestDiff) { bestDiff = diff; bestFreq = candidate; }
     }
     const cents = centsDiff(bestFreq, s.freq);
-    const angle = centsToAngle(cents);
 
-    needle.style.transform = `translateX(-50%) rotate(${angle}deg)`;
+    // Rolling average over last 6 readings for stability
+    pitchHistory.push(cents);
+    if (pitchHistory.length > 6) pitchHistory.shift();
+    const avgCents = pitchHistory.reduce((a,b) => a+b, 0) / pitchHistory.length;
+
+    // Smooth needle with lerp (0.15 = slow/stable, higher = faster)
+    const targetAngle = centsToAngle(avgCents);
+    smoothAngle += (targetAngle - smoothAngle) * 0.18;
+    needle.style.transform = `translateX(-50%) rotate(${smoothAngle.toFixed(1)}deg)`;
+
     freqDisp.innerHTML = `<span>${pitch.toFixed(1)} Hz</span> &nbsp;·&nbsp; Ziel: ${s.freq.toFixed(2)} Hz`;
 
-    const absCents = Math.abs(cents);
+    const absCents = Math.abs(avgCents);
     if (absCents < 5) {
       statusEl.textContent = '✓ PERFEKT';
       statusEl.style.color = '#6fcf97';
       row.classList.add('in-tune');
       inTuneCount++;
     } else if (absCents < 15) {
-      statusEl.textContent = cents < 0 ? '▲ LEICHT ZU TIEF' : '▼ LEICHT ZU HOCH';
+      statusEl.textContent = avgCents < 0 ? '▲ LEICHT ZU TIEF' : '▼ LEICHT ZU HOCH';
       statusEl.style.color = '#e0b055';
       row.classList.remove('in-tune');
       inTuneCount = 0;
     } else {
-      statusEl.textContent = cents < 0 ? '▲▲ ZU TIEF' : '▼▼ ZU HOCH';
+      statusEl.textContent = avgCents < 0 ? '▲▲ ZU TIEF' : '▼▼ ZU HOCH';
       statusEl.style.color = '#e05555';
       row.classList.remove('in-tune');
       inTuneCount = 0;
