@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gitarre Stimmen</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&display=swap');
+
+  :root { --bg: #111; --text: #f0ead6; --muted: #444; --gold: #e8c97a; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; padding: 2rem 1rem;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background: repeating-linear-gradient(91deg, transparent, transparent 70px,
+      rgba(200,169,110,0.018) 70px, rgba(200,169,110,0.018) 71px);
+    pointer-events: none;
+  }
+
+  h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(2.2rem, 7vw, 4rem); letter-spacing: 0.18em;
+    color: var(--gold); text-align: center;
+    text-shadow: 0 0 40px rgba(232,201,122,0.25); margin-bottom: 0.15em;
+  }
+  .subtitle {
+    font-size: 0.6rem; letter-spacing: 0.35em; color: var(--muted);
+    text-transform: uppercase; text-align: center; margin-bottom: 2.5rem;
+  }
+
+  .strings { display: flex; flex-direction: column; gap: 0.6rem; width: min(560px, 96vw); }
+
+  /* ── String row ── */
+  .string-row {
+    display: flex; flex-direction: column;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(200,169,110,0.15);
+    border-radius: 8px; overflow: hidden;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .string-row.plucking { border-color: var(--gold); box-shadow: 0 0 20px rgba(232,201,122,0.15); }
+  .string-row.droning  { border-color: var(--gold); box-shadow: 0 0 20px rgba(232,201,122,0.2); }
+  .string-row.tuning   { border-color: #7ab0cc;     box-shadow: 0 0 20px rgba(122,176,204,0.2); }
+  .string-row.in-tune  { border-color: #6fcf97;     box-shadow: 0 0 28px rgba(111,207,151,0.35); }
+
+  .row-main {
+    position: relative; display: flex; align-items: center; overflow: hidden;
+  }
+  .color-bar {
+    width: 4px; height: 100%; position: absolute; left: 0; top: 0;
+    opacity: 0.45; transition: opacity 0.2s;
+  }
+  .string-row.plucking .color-bar,
+  .string-row.droning  .color-bar,
+  .string-row.tuning   .color-bar,
+  .string-row.in-tune  .color-bar { opacity: 1; }
+
+  .pluck-area {
+    display: flex; align-items: center; flex: 1;
+    padding: 1rem 0.8rem 1rem 1.4rem;
+    cursor: pointer; gap: 0.8rem;
+    background: none; border: none; color: inherit;
+    transition: background 0.15s; min-width: 0;
+  }
+  .pluck-area:hover { background: rgba(232,201,122,0.05); }
+
+  .note {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.8rem; line-height: 1; min-width: 2.5rem;
+    color: var(--gold); text-align: left;
+  }
+  .info { flex: 1; text-align: left; min-width: 0; }
+  .string-label { font-size: 0.6rem; letter-spacing: 0.2em; color: var(--text); text-transform: uppercase; margin-bottom: 0.2rem; }
+  .freq-label   { font-size: 0.5rem; color: var(--muted); letter-spacing: 0.08em; }
+
+  .wave-wrap { width: 70px; height: 22px; flex-shrink: 0; }
+  .wave-svg  { width: 100%; height: 100%; opacity: 0.1; transition: opacity 0.3s; }
+  .string-row.plucking .wave-svg,
+  .string-row.droning  .wave-svg { opacity: 1; }
+  .wave-path { transform-origin: 35px 11px; }
+  .string-row.plucking .wave-path { animation: wiggle 0.38s ease-in-out infinite alternate; }
+  .string-row.droning  .wave-path { animation: wiggle 0.55s ease-in-out infinite alternate; }
+  @keyframes wiggle { from { transform: scaleY(0.3); } to { transform: scaleY(1.7); } }
+
+  .divider { width: 1px; height: 40px; background: rgba(200,169,110,0.15); flex-shrink: 0; }
+
+  /* Drone button */
+  .drone-btn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 0.2rem; width: 58px; height: 100%; padding: 0.8rem 0.4rem;
+    background: none; border: none; cursor: pointer; transition: background 0.15s; flex-shrink: 0;
+  }
+  .drone-btn:hover { background: rgba(232,201,122,0.07); }
+  .string-row.droning .drone-btn { background: rgba(232,201,122,0.1); }
+  .drone-icon { font-size: 1rem; color: var(--muted); transition: color 0.2s; line-height: 1; }
+  .drone-btn:hover .drone-icon    { color: var(--gold); }
+  .string-row.droning .drone-icon { color: var(--gold); animation: pulse 1s ease-in-out infinite alternate; }
+  @keyframes pulse { from { opacity:0.6; transform:scale(0.95); } to { opacity:1; transform:scale(1.05); } }
+  .drone-label { font-size: 0.38rem; letter-spacing: 0.12em; color: var(--muted); text-transform: uppercase; transition: color 0.2s; }
+  .drone-btn:hover .drone-label    { color: rgba(232,201,122,0.6); }
+  .string-row.droning .drone-label { color: var(--gold); }
+
+  /* Mic/tune button */
+  .tune-btn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 0.2rem; width: 58px; height: 100%; padding: 0.8rem 0.4rem;
+    background: none; border: none; border-left: 1px solid rgba(200,169,110,0.15);
+    cursor: pointer; transition: background 0.15s; flex-shrink: 0;
+  }
+  .tune-btn:hover { background: rgba(122,176,204,0.08); }
+  .string-row.tuning  .tune-btn,
+  .string-row.in-tune .tune-btn { background: rgba(122,176,204,0.12); }
+  .tune-icon { font-size: 1rem; color: var(--muted); transition: color 0.2s; line-height: 1; }
+  .tune-btn:hover .tune-icon      { color: #7ab0cc; }
+  .string-row.tuning  .tune-icon,
+  .string-row.in-tune .tune-icon  { color: #7ab0cc; animation: pulse 1.2s ease-in-out infinite alternate; }
+  .tune-label { font-size: 0.38rem; letter-spacing: 0.12em; color: var(--muted); text-transform: uppercase; transition: color 0.2s; }
+  .tune-btn:hover .tune-label     { color: rgba(122,176,204,0.7); }
+  .string-row.tuning  .tune-label,
+  .string-row.in-tune .tune-label { color: #7ab0cc; }
+
+  /* ── Tuner Panel ── */
+  .tuner-panel {
+    max-height: 0; overflow: hidden;
+    transition: max-height 0.35s ease, padding 0.35s ease;
+    background: rgba(0,0,0,0.3);
+    border-top: 1px solid transparent;
+  }
+  .string-row.tuning  .tuner-panel,
+  .string-row.in-tune .tuner-panel {
+    max-height: 180px;
+    border-top-color: rgba(122,176,204,0.15);
+    padding: 1rem;
+  }
+
+  .tuner-inner { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; }
+
+  /* Gauge arc */
+  .gauge-wrap { position: relative; width: 240px; height: 100px; }
+  .gauge-svg  { width: 100%; height: 100%; }
+
+  /* Needle */
+  .needle {
+    position: absolute;
+    bottom: 0; left: 50%;
+    width: 2px; height: 82px;
+    background: linear-gradient(to top, rgba(255,255,255,0.8), transparent);
+    transform-origin: bottom center;
+    transform: translateX(-50%) rotate(0deg);
+    transition: transform 0.12s ease-out;
+    border-radius: 2px;
+  }
+  .needle::after {
+    content: '';
+    position: absolute; bottom: -4px; left: 50%;
+    transform: translateX(-50%);
+    width: 10px; height: 10px;
+    background: white; border-radius: 50%;
+  }
+
+  /* Status text */
+  .tuner-status {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.4rem; letter-spacing: 0.15em;
+    color: var(--muted); transition: color 0.2s;
+    text-align: center;
+  }
+  .string-row.in-tune .tuner-status { color: #6fcf97; text-shadow: 0 0 12px rgba(111,207,151,0.5); }
+
+  .tuner-freq-display {
+    font-size: 0.55rem; color: var(--muted); letter-spacing: 0.1em; text-align: center;
+  }
+  .tuner-freq-display span { color: var(--text); }
+
+  .hint {
+    font-size: 0.5rem; letter-spacing: 0.22em; color: var(--muted); text-align: center;
+    margin-top: 1.6rem; text-transform: uppercase; opacity: 0.4; line-height: 1.8;
+  }
+</style>
+</head>
+<body>
+
+<h1>GITARRE STIMMEN</h1>
+<p class="subtitle">Standard-Stimmung &nbsp;·&nbsp; E A D G H E</p>
+
+<div class="strings" id="strings">
+</div>
+
+<p class="hint">
+  Saite = Anzupfen &nbsp;·&nbsp; ∿ = Dauerton &nbsp;·&nbsp; 🎤 = Stimmgerät
+</p>
+
+<script>
+// ── String data ──
+const STRINGS = [
+  { note:'E', label:'6. Saite · Tief E',  freq:82.41,  dur:5, color:'#d4824a' },
+  { note:'A', label:'5. Saite · A',        freq:110,    dur:5, color:'#c8a96e' },
+  { note:'D', label:'4. Saite · D',        freq:146.83, dur:5, color:'#b0b890' },
+  { note:'G', label:'3. Saite · G',        freq:196,    dur:4, color:'#8fc28a' },
+  { note:'H', label:'2. Saite · H',        freq:246.94, dur:4, color:'#7ab0cc' },
+  { note:'E', label:'1. Saite · Hoch E',   freq:329.63, dur:4, color:'#e8c97a' },
+];
+
+// ── Build DOM ──
+const container = document.getElementById('strings');
+STRINGS.forEach((s, i) => {
+  container.innerHTML += `
+  <div class="string-row" id="row${i}" data-freq="${s.freq}" data-dur="${s.dur}">
+    <div class="row-main">
+      <div class="color-bar" style="background:${s.color}"></div>
+      <button class="pluck-area" data-idx="${i}">
+        <div class="note">${s.note}</div>
+        <div class="info">
+          <div class="string-label">${s.label.replace('·','&nbsp;·&nbsp;')}</div>
+          <div class="freq-label">${s.freq.toFixed(2)} Hz</div>
+        </div>
+        <svg class="wave-svg wave-wrap" viewBox="0 0 70 22" preserveAspectRatio="none">
+          <path class="wave-path" d="M0,11 Q9,3 18,11 Q27,19 35,11 Q43,3 52,11 Q61,19 70,11"
+            fill="none" stroke="${s.color}" stroke-width="2"/>
+        </svg>
+      </button>
+      <div class="divider"></div>
+      <button class="drone-btn" data-idx="${i}">
+        <span class="drone-icon">∿</span>
+        <span class="drone-label">Dauer</span>
+      </button>
+      <button class="tune-btn" data-idx="${i}">
+        <span class="tune-icon">🎤</span>
+        <span class="tune-label">Stimmen</span>
+      </button>
+    </div>
+    <div class="tuner-panel">
+      <div class="tuner-inner">
+        <div class="gauge-wrap">
+          <svg class="gauge-svg" viewBox="0 0 240 105">
+            <!-- Gauge arc background -->
+            <defs>
+              <linearGradient id="arcGrad${i}" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%"   stop-color="#e05555"/>
+                <stop offset="35%"  stop-color="#e0b055"/>
+                <stop offset="50%"  stop-color="#6fcf97"/>
+                <stop offset="65%"  stop-color="#e0b055"/>
+                <stop offset="100%" stop-color="#e05555"/>
+              </linearGradient>
+            </defs>
+            <!-- Background arc -->
+            <path d="M 20,100 A 100,100 0 0,1 220,100" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="8" stroke-linecap="round"/>
+            <!-- Colored arc -->
+            <path d="M 20,100 A 100,100 0 0,1 220,100" fill="none" stroke="url(#arcGrad${i})" stroke-width="8" stroke-linecap="round" opacity="0.7"/>
+            <!-- Center tick -->
+            <line x1="120" y1="5" x2="120" y2="18" stroke="rgba(111,207,151,0.8)" stroke-width="2"/>
+            <!-- Side ticks -->
+            <line x1="20"  y1="100" x2="32"  y2="98" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" transform="rotate(-5,  20, 100)"/>
+            <line x1="220" y1="100" x2="208" y2="98" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" transform="rotate( 5, 220, 100)"/>
+            <text x="14"  y="96" font-size="9" fill="rgba(255,255,255,0.3)" font-family="monospace">−50</text>
+            <text x="199" y="96" font-size="9" fill="rgba(255,255,255,0.3)" font-family="monospace">+50</text>
+            <text x="109" y="96" font-size="9" fill="rgba(111,207,151,0.6)" font-family="monospace">0</text>
+          </svg>
+          <div class="needle" id="needle${i}"></div>
+        </div>
+        <div class="tuner-status" id="status${i}">WARTE ...</div>
+        <div class="tuner-freq-display" id="freqDisplay${i}">— Hz &nbsp;·&nbsp; Ziel: ${s.freq.toFixed(2)} Hz</div>
+      </div>
+    </div>
+  </div>`;
+});
+
+// ── Audio engine ──
+let audioCtx = null, masterOut = null;
+let pluckNodes = null, pluckRow = null, pluckTimer = null;
+let droneNodes = null, droneRow = null;
+
+// Tuner state
+let tunerStream = null, tunerAnalyser = null, tunerSource = null;
+let tunerRow = null, tunerIdx = null, tunerRAF = null;
+
+function getCtx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterOut = audioCtx.createDynamicsCompressor();
+    masterOut.threshold.setValueAtTime(-8, audioCtx.currentTime);
+    masterOut.ratio.setValueAtTime(5, audioCtx.currentTime);
+    masterOut.attack.setValueAtTime(0.003, audioCtx.currentTime);
+    masterOut.release.setValueAtTime(0.15, audioCtx.currentTime);
+    masterOut.connect(audioCtx.destination);
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+// Pluck
+function startPluck(freq, dur) {
+  const ctx = getCtx();
+  const osc = ctx.createOscillator(), osc2 = ctx.createOscillator();
+  const gain = ctx.createGain(), filt = ctx.createBiquadFilter();
+  osc.type = 'sawtooth'; osc.frequency.setValueAtTime(freq, ctx.currentTime);
+  osc2.type = 'triangle'; osc2.frequency.setValueAtTime(freq*1.002, ctx.currentTime);
+  filt.type = 'lowpass';
+  filt.frequency.setValueAtTime(freq*10, ctx.currentTime);
+  filt.frequency.exponentialRampToValueAtTime(freq*2.5, ctx.currentTime+1.5);
+  filt.Q.setValueAtTime(1.2, ctx.currentTime);
+  gain.gain.setValueAtTime(0, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(0.85, ctx.currentTime+0.006);
+  gain.gain.exponentialRampToValueAtTime(0.45, ctx.currentTime+0.4);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+dur);
+  osc.connect(filt); osc2.connect(filt); filt.connect(gain); gain.connect(masterOut);
+  osc.start(); osc2.start();
+  osc.stop(ctx.currentTime+dur+0.2); osc2.stop(ctx.currentTime+dur+0.2);
+  return { osc, osc2, gain };
+}
+function stopPluck() {
+  if (pluckTimer) { clearTimeout(pluckTimer); pluckTimer = null; }
+  if (pluckNodes) {
+    try {
+      pluckNodes.gain.gain.cancelScheduledValues(audioCtx.currentTime);
+      pluckNodes.gain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.06);
+      pluckNodes.osc.stop(audioCtx.currentTime+0.15);
+      pluckNodes.osc2.stop(audioCtx.currentTime+0.15);
+    } catch(e) {}
+    pluckNodes = null;
+  }
+  if (pluckRow) { pluckRow.classList.remove('plucking'); pluckRow = null; }
+}
+
+// Drone
+function startDrone(freq) {
+  const ctx = getCtx();
+  const osc = ctx.createOscillator(), osc2 = ctx.createOscillator(), osc3 = ctx.createOscillator();
+  const gainOct = ctx.createGain(), gain = ctx.createGain(), filt = ctx.createBiquadFilter();
+  osc.type='sine'; osc.frequency.setValueAtTime(freq, ctx.currentTime);
+  osc2.type='sine'; osc2.frequency.setValueAtTime(freq*1.003, ctx.currentTime);
+  osc3.type='sine'; osc3.frequency.setValueAtTime(freq*2, ctx.currentTime);
+  gainOct.gain.setValueAtTime(0.35, ctx.currentTime);
+  filt.type='lowpass'; filt.frequency.setValueAtTime(freq*8, ctx.currentTime);
+  gain.gain.setValueAtTime(0, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(0.75, ctx.currentTime+0.08);
+  osc.connect(filt); osc2.connect(filt);
+  osc3.connect(gainOct); gainOct.connect(filt);
+  filt.connect(gain); gain.connect(masterOut);
+  osc.start(); osc2.start(); osc3.start();
+  return { osc, osc2, osc3, gain };
+}
+function stopDrone() {
+  if (droneNodes) {
+    try {
+      droneNodes.gain.gain.cancelScheduledValues(audioCtx.currentTime);
+      droneNodes.gain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.08);
+      droneNodes.osc.stop(audioCtx.currentTime+0.3);
+      droneNodes.osc2.stop(audioCtx.currentTime+0.3);
+      droneNodes.osc3.stop(audioCtx.currentTime+0.3);
+    } catch(e) {}
+    droneNodes = null;
+  }
+  if (droneRow) { droneRow.classList.remove('droning'); droneRow = null; }
+}
+
+// ── Pitch detection via autocorrelation ──
+function detectPitch(analyser, sampleRate) {
+  const bufLen = analyser.fftSize;
+  const buf = new Float32Array(bufLen);
+  analyser.getFloatTimeDomainData(buf);
+
+  // RMS check — ignore silence
+  let rms = 0;
+  for (let i = 0; i < bufLen; i++) rms += buf[i] * buf[i];
+  rms = Math.sqrt(rms / bufLen);
+  if (rms < 0.01) return null;
+
+  // Autocorrelation
+  const corr = new Float32Array(bufLen);
+  for (let lag = 0; lag < bufLen; lag++) {
+    let sum = 0;
+    for (let i = 0; i < bufLen - lag; i++) sum += buf[i] * buf[i + lag];
+    corr[lag] = sum;
+  }
+
+  // Find first dip below zero, then first peak after
+  let i = 1;
+  while (i < bufLen && corr[i] > corr[0] * 0.5) i++;
+  while (i < bufLen && corr[i] <= 0) i++;
+
+  let maxVal = -1, maxIdx = i;
+  for (let j = i; j < bufLen; j++) {
+    if (corr[j] > maxVal) { maxVal = corr[j]; maxIdx = j; }
+  }
+  if (maxIdx === 0 || maxVal < corr[0] * 0.3) return null;
+
+  // Parabolic interpolation for sub-sample accuracy
+  const y1 = corr[maxIdx - 1] || 0;
+  const y2 = corr[maxIdx];
+  const y3 = corr[maxIdx + 1] || 0;
+  const offset = (y3 - y1) / (2 * (2*y2 - y1 - y3) || 1);
+  const period = maxIdx + offset;
+
+  return sampleRate / period;
+}
+
+// Cents deviation from target
+function centsDiff(detected, target) {
+  return 1200 * Math.log2(detected / target);
+}
+
+// Needle angle: -90° = -50 cents left, 0° = center, +90° = +50 cents right
+function centsToAngle(cents) {
+  return Math.max(-90, Math.min(90, cents * 1.8));
+}
+
+// ── Tuner logic ──
+async function startTuner(idx) {
+  const s = STRINGS[idx];
+  const row = document.getElementById(`row${idx}`);
+  const needle = document.getElementById(`needle${idx}`);
+  const statusEl = document.getElementById(`status${idx}`);
+  const freqDisp = document.getElementById(`freqDisplay${idx}`);
+
+  try {
+    tunerStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+    });
+  } catch(e) {
+    statusEl.textContent = 'MIC FEHLER';
+    statusEl.style.color = '#e05555';
+    return;
+  }
+
+  const ctx = getCtx();
+  tunerAnalyser = ctx.createAnalyser();
+  tunerAnalyser.fftSize = 4096;
+  tunerAnalyser.smoothingTimeConstant = 0.5;
+  tunerSource = ctx.createMediaStreamSource(tunerStream);
+  tunerSource.connect(tunerAnalyser);
+  // NOTE: NOT connecting to masterOut — we don't want mic feedback
+
+  tunerRow = row;
+  tunerIdx = idx;
+  row.classList.add('tuning');
+
+  let inTuneCount = 0;
+
+  function tick() {
+    tunerRAF = requestAnimationFrame(tick);
+    const pitch = detectPitch(tunerAnalyser, ctx.sampleRate);
+
+    if (!pitch || pitch < 60 || pitch > 1400) {
+      statusEl.textContent = 'WARTE ...';
+      statusEl.style.color = '';
+      freqDisp.innerHTML = `— Hz &nbsp;·&nbsp; Ziel: ${s.freq.toFixed(2)} Hz`;
+      needle.style.transform = `translateX(-50%) rotate(0deg)`;
+      inTuneCount = 0;
+      return;
+    }
+
+    // Find closest harmonic/sub-harmonic near target
+    let bestFreq = pitch;
+    let bestDiff = Infinity;
+    for (let m = 0.5; m <= 4; m += 0.5) {
+      const candidate = pitch * m;
+      const diff = Math.abs(centsDiff(candidate, s.freq));
+      if (diff < bestDiff) { bestDiff = diff; bestFreq = candidate; }
+    }
+    const cents = centsDiff(bestFreq, s.freq);
+    const angle = centsToAngle(cents);
+
+    needle.style.transform = `translateX(-50%) rotate(${angle}deg)`;
+    freqDisp.innerHTML = `<span>${pitch.toFixed(1)} Hz</span> &nbsp;·&nbsp; Ziel: ${s.freq.toFixed(2)} Hz`;
+
+    const absCents = Math.abs(cents);
+    if (absCents < 5) {
+      statusEl.textContent = '✓ PERFEKT';
+      statusEl.style.color = '#6fcf97';
+      row.classList.add('in-tune');
+      inTuneCount++;
+    } else if (absCents < 15) {
+      statusEl.textContent = cents < 0 ? '▲ LEICHT ZU TIEF' : '▼ LEICHT ZU HOCH';
+      statusEl.style.color = '#e0b055';
+      row.classList.remove('in-tune');
+      inTuneCount = 0;
+    } else {
+      statusEl.textContent = cents < 0 ? '▲▲ ZU TIEF' : '▼▼ ZU HOCH';
+      statusEl.style.color = '#e05555';
+      row.classList.remove('in-tune');
+      inTuneCount = 0;
+    }
+  }
+  tick();
+}
+
+function stopTuner() {
+  if (tunerRAF) { cancelAnimationFrame(tunerRAF); tunerRAF = null; }
+  if (tunerSource) { tunerSource.disconnect(); tunerSource = null; }
+  if (tunerAnalyser) { tunerAnalyser.disconnect(); tunerAnalyser = null; }
+  if (tunerStream) { tunerStream.getTracks().forEach(t => t.stop()); tunerStream = null; }
+  if (tunerRow) {
+    tunerRow.classList.remove('tuning', 'in-tune');
+    const idx = tunerIdx;
+    const needle = document.getElementById(`needle${idx}`);
+    const statusEl = document.getElementById(`status${idx}`);
+    const freqDisp = document.getElementById(`freqDisplay${idx}`);
+    if (needle) needle.style.transform = 'translateX(-50%) rotate(0deg)';
+    if (statusEl) { statusEl.textContent = 'WARTE ...'; statusEl.style.color = ''; }
+    if (freqDisp) freqDisp.innerHTML = `— Hz &nbsp;·&nbsp; Ziel: ${STRINGS[idx].freq.toFixed(2)} Hz`;
+    tunerRow = null; tunerIdx = null;
+  }
+}
+
+// ── Wire up buttons ──
+document.querySelectorAll('.pluck-area').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const idx = +btn.dataset.idx;
+    const row = document.getElementById(`row${idx}`);
+    const freq = STRINGS[idx].freq, dur = STRINGS[idx].dur;
+    const wasMe = pluckRow === row;
+    stopPluck();
+    if (!wasMe) {
+      pluckNodes = startPluck(freq, dur); pluckRow = row;
+      row.classList.add('plucking');
+      pluckTimer = setTimeout(() => {
+        if (pluckRow === row) { row.classList.remove('plucking'); pluckRow = null; pluckNodes = null; }
+      }, (dur+0.3)*1000);
+    }
+  });
+});
+
+document.querySelectorAll('.drone-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const idx = +btn.dataset.idx;
+    const row = document.getElementById(`row${idx}`);
+    const wasMe = droneRow === row;
+    stopDrone();
+    if (!wasMe) {
+      droneNodes = startDrone(STRINGS[idx].freq); droneRow = row;
+      row.classList.add('droning');
+    }
+  });
+});
+
+document.querySelectorAll('.tune-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const idx = +btn.dataset.idx;
+    const row = document.getElementById(`row${idx}`);
+    const wasMe = tunerRow === row;
+    stopTuner();
+    if (!wasMe) startTuner(idx);
+  });
+});
+</script>
+</body>
+</html>
